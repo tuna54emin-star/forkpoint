@@ -1,1 +1,994 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ForkPoint — Otonom Araç Karar Motoru</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0c10;
+    --bg-panel:#12151b;
+    --bg-panel-2:#171b22;
+    --border:#242a34;
+    --text:#e7eaf0;
+    --text-dim:#8992a3;
+    --text-faint:#5b6273;
+    --amber:#ffb020;
+    --amber-dim:#8a611c;
+    --blue:#5ec8ff;
+    --red:#ff6a5c;
+    --green:#5ee6a0;
+    --radius:10px;
+    --mono:'IBM Plex Mono', ui-monospace, monospace;
+    --sans:'IBM Plex Sans', -apple-system, sans-serif;
+  }
 
+  *{box-sizing:border-box; margin:0; padding:0;}
+
+  html{scroll-behavior:smooth;}
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto;}
+    *{animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important;}
+  }
+
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+
+  a{color:inherit;}
+  :focus-visible{outline:2px solid var(--amber); outline-offset:3px; border-radius:4px;}
+
+  .wrap{max-width:1080px; margin:0 auto; padding:0 24px;}
+
+  /* ---------- lane divider ---------- */
+  .lane{
+    height:2px;
+    width:100%;
+    background-image: repeating-linear-gradient(90deg, var(--text-faint) 0 28px, transparent 28px 46px);
+    opacity:0.5;
+  }
+  .lane.amber{background-image: repeating-linear-gradient(90deg, var(--amber-dim) 0 28px, transparent 28px 46px);}
+
+  /* ---------- nav ---------- */
+  header{
+    position:sticky; top:0; z-index:50;
+    background:rgba(10,12,16,0.85);
+    backdrop-filter: blur(10px);
+    border-bottom:1px solid var(--border);
+  }
+  nav{
+    max-width:1080px; margin:0 auto; padding:16px 24px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .brand{
+    font-family:var(--mono); font-weight:700; font-size:18px;
+    letter-spacing:0.02em; display:flex; align-items:center; gap:8px;
+  }
+  .brand .mark{color:var(--amber);}
+  nav ul{list-style:none; display:flex; gap:28px;}
+  nav a{
+    font-family:var(--mono); font-size:13px; text-decoration:none;
+    color:var(--text-dim); letter-spacing:0.03em; text-transform:uppercase;
+    transition:color .15s;
+  }
+  nav a:hover{color:var(--amber);}
+  @media (max-width:720px){ nav ul{display:none;} }
+
+  /* ---------- hero ---------- */
+  .hero{
+    position:relative;
+    padding:88px 0 64px;
+    overflow:hidden;
+  }
+  .eyebrow{
+    font-family:var(--mono); font-size:12px; letter-spacing:0.18em;
+    color:var(--amber); text-transform:uppercase; margin-bottom:18px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .eyebrow::before{content:''; width:22px; height:1px; background:var(--amber);}
+
+  .hero h1{
+    font-family:var(--mono); font-weight:700;
+    font-size:clamp(34px, 6vw, 62px);
+    line-height:1.08;
+    letter-spacing:-0.01em;
+    max-width:820px;
+    margin-bottom:22px;
+  }
+  .hero h1 .accent{color:var(--amber);}
+
+  .hero p.lead{
+    font-size:18px; color:var(--text-dim); max-width:600px; margin-bottom:34px;
+  }
+
+  .cta-row{display:flex; gap:14px; flex-wrap:wrap; margin-bottom:56px;}
+  .btn{
+    font-family:var(--mono); font-size:13px; letter-spacing:0.02em;
+    padding:13px 22px; border-radius:6px; text-decoration:none;
+    display:inline-flex; align-items:center; gap:8px;
+    transition:transform .15s, background .15s, border-color .15s;
+    cursor:pointer; border:1px solid transparent;
+  }
+  .btn-primary{background:var(--amber); color:#171100; font-weight:600;}
+  .btn-primary:hover{transform:translateY(-1px); background:#ffc555;}
+  .btn-ghost{border-color:var(--border); color:var(--text);}
+  .btn-ghost:hover{border-color:var(--amber); color:var(--amber);}
+
+  .term{
+    font-family:var(--mono); font-size:13px; color:var(--text-dim);
+    background:var(--bg-panel); border:1px solid var(--border); border-radius:8px;
+    padding:14px 18px; display:inline-block; max-width:100%; overflow-x:auto;
+  }
+  .term .k{color:var(--blue);}
+  .term .s{color:var(--amber);}
+  .term .c{color:var(--text-faint);}
+
+  /* ---------- road svg ---------- */
+  .road-wrap{margin-top:8px;}
+  .road-wrap svg{width:100%; height:auto; display:block;}
+  .road-path{
+    fill:none; stroke:var(--text-faint); stroke-width:2;
+    stroke-dasharray:1600; stroke-dashoffset:1600;
+    animation: draw 2.4s ease-out forwards .3s;
+  }
+  .road-path.hi{stroke:var(--amber); stroke-width:2.4;}
+  @keyframes draw{ to{stroke-dashoffset:0;} }
+  .lane-label{
+    font-family:var(--mono); font-size:11px; fill:var(--text-dim);
+    letter-spacing:0.04em;
+  }
+  .lane-label.amber{fill:var(--amber);}
+
+  /* ---------- sections ---------- */
+  section{padding:74px 0;}
+  .section-head{margin-bottom:44px; max-width:640px;}
+  .section-head .eyebrow{margin-bottom:14px;}
+  .section-head h2{
+    font-family:var(--mono); font-weight:600; font-size:clamp(24px,3.4vw,34px);
+    margin-bottom:14px; letter-spacing:-0.01em;
+  }
+  .section-head p{color:var(--text-dim); font-size:16px;}
+
+  /* problem */
+  .problem-card{
+    background:var(--bg-panel); border:1px solid var(--border); border-radius:var(--radius);
+    padding:36px; display:grid; grid-template-columns:auto 1fr; gap:28px; align-items:start;
+  }
+  .problem-card .glyph{
+    font-family:var(--mono); font-size:40px; color:var(--red); line-height:1;
+  }
+  .problem-card p{color:var(--text-dim); font-size:16px; max-width:620px;}
+  .problem-card p + p{margin-top:14px;}
+  @media (max-width:600px){ .problem-card{grid-template-columns:1fr;} }
+
+  /* modules */
+  .module{
+    border:1px solid var(--border); border-radius:var(--radius);
+    background:var(--bg-panel); margin-bottom:20px; overflow:hidden;
+    opacity:0; transform:translateY(16px);
+    transition:opacity .5s ease, transform .5s ease;
+  }
+  .module.in-view{opacity:1; transform:translateY(0);}
+  .module-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:22px 28px; border-bottom:1px solid var(--border);
+    flex-wrap:wrap; gap:10px;
+  }
+  .module-head .file{
+    font-family:var(--mono); font-size:12px; color:var(--text-faint);
+  }
+  .module-head h3{
+    font-family:var(--mono); font-size:20px; font-weight:600;
+  }
+  .module-body{padding:26px 28px 30px;}
+  .module-body p.desc{color:var(--text-dim); margin-bottom:22px; max-width:640px;}
+
+  .chip-row{display:flex; flex-wrap:wrap; gap:10px;}
+  .chip{
+    font-family:var(--mono); font-size:12.5px; padding:9px 13px;
+    border:1px solid var(--border); border-radius:6px; color:var(--text-dim);
+    background:var(--bg-panel-2);
+  }
+  .chip b{color:var(--text); font-weight:600;}
+
+  .formula{
+    font-family:var(--mono); font-size:15px; color:var(--blue);
+    background:var(--bg-panel-2); border:1px solid var(--border); border-radius:8px;
+    padding:16px 20px; margin-bottom:22px; display:inline-block;
+  }
+  .formula .op{color:var(--text-faint); margin:0 8px;}
+
+  .bar-row{display:flex; flex-direction:column; gap:10px; max-width:420px;}
+  .bar-item{display:grid; grid-template-columns:96px 1fr 44px; align-items:center; gap:10px;}
+  .bar-item .lbl{font-family:var(--mono); font-size:12px; color:var(--text-dim);}
+  .bar-item .track{height:8px; background:var(--bg-panel-2); border-radius:4px; overflow:hidden; border:1px solid var(--border);}
+  .bar-item .fill{height:100%; background:linear-gradient(90deg, var(--amber-dim), var(--amber));}
+  .bar-item .val{font-family:var(--mono); font-size:12px; color:var(--text-faint); text-align:right;}
+
+  .legal-grid{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
+  @media (max-width:640px){ .legal-grid{grid-template-columns:1fr;} }
+  .legal-col{
+    background:var(--bg-panel-2); border:1px solid var(--border); border-radius:8px; padding:18px 20px;
+  }
+  .legal-col h4{font-family:var(--mono); font-size:13px; color:var(--amber); margin-bottom:12px; letter-spacing:0.03em;}
+  .legal-col ol{list-style:none; display:flex; flex-direction:column; gap:9px;}
+  .legal-col li{font-size:14px; color:var(--text-dim); display:flex; gap:10px;}
+  .legal-col li .n{font-family:var(--mono); color:var(--text-faint); flex-shrink:0;}
+
+  /* scenarios */
+  .scn-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px;}
+  .scn-card{
+    border:1px solid var(--border); border-radius:8px; padding:18px;
+    background:var(--bg-panel);
+  }
+  .scn-card .id{font-family:var(--mono); font-size:12px; color:var(--amber); margin-bottom:8px;}
+  .scn-card .t{font-size:14px; color:var(--text); font-weight:600; margin-bottom:6px;}
+  .scn-card .d{font-size:12.5px; color:var(--text-faint);}
+
+  /* mock GUI */
+  .mock{
+    border:1px solid var(--border); border-radius:var(--radius); overflow:hidden;
+    background:var(--bg-panel);
+  }
+  .mock-bar{
+    background:var(--bg-panel-2); padding:10px 16px; display:flex; gap:8px; align-items:center;
+    border-bottom:1px solid var(--border);
+  }
+  .mock-bar span{width:9px; height:9px; border-radius:50%; background:var(--border);}
+  .mock-bar .title{font-family:var(--mono); font-size:11px; color:var(--text-faint); margin-left:8px;}
+  .mock-body{padding:28px 22px;}
+  .mock-body svg{width:100%; height:auto; display:block;}
+
+  /* diff table */
+  .diff{width:100%; border-collapse:collapse; font-size:14px;}
+  .diff th, .diff td{
+    text-align:left; padding:14px 16px; border-bottom:1px solid var(--border);
+  }
+  .diff th{font-family:var(--mono); font-size:12px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.04em; font-weight:500;}
+  .diff td{color:var(--text-dim);}
+  .diff td.yes{color:var(--green);}
+  .diff tr:last-child td{border-bottom:none; color:var(--text); font-weight:600;}
+  .diff tr:last-child{background:rgba(255,176,32,0.05);}
+  .diff-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius);}
+  .diff-wrap table{border:none;}
+  .diff-wrap th:first-child, .diff-wrap td:first-child{padding-left:20px;}
+
+  /* stack chips */
+  .stack{display:flex; flex-wrap:wrap; gap:10px; margin-top:20px;}
+  .stack span{
+    font-family:var(--mono); font-size:12px; color:var(--text-faint);
+    border:1px solid var(--border); padding:7px 12px; border-radius:20px;
+  }
+
+  footer{
+    border-top:1px solid var(--border); padding:40px 0 50px;
+    display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:20px;
+  }
+  footer .fbrand{font-family:var(--mono); font-size:14px; color:var(--text-dim);}
+  footer .fbrand b{color:var(--text);}
+  footer .fnote{font-size:12.5px; color:var(--text-faint); max-width:360px;}
+
+  .reveal{opacity:0; transform:translateY(16px); transition:opacity .5s ease, transform .5s ease;}
+  .reveal.in-view{opacity:1; transform:translateY(0);}
+
+  /* ---------- live simulator ---------- */
+  .sim-panel{
+    border:1px solid var(--amber-dim); border-radius:var(--radius);
+    background:var(--bg-panel); overflow:hidden;
+  }
+  .sim-head{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:16px 22px; border-bottom:1px solid var(--border); background:var(--bg-panel-2);
+  }
+  .sim-head .dot{width:8px; height:8px; border-radius:50%; background:var(--green); box-shadow:0 0 0 3px rgba(94,230,160,0.15);}
+  .sim-head .title{font-family:var(--mono); font-size:13px; font-weight:600; letter-spacing:0.04em; color:var(--amber);}
+  .sim-head .sub{font-family:var(--mono); font-size:11.5px; color:var(--text-faint);}
+
+  .sim-grid{display:grid; grid-template-columns:340px 1fr; gap:0;}
+  @media (max-width:760px){ .sim-grid{grid-template-columns:1fr;} }
+
+  .sim-controls{padding:24px; border-right:1px solid var(--border); display:flex; flex-direction:column; gap:18px;}
+  @media (max-width:760px){ .sim-controls{border-right:none; border-bottom:1px solid var(--border);} }
+
+  .field label{display:block; font-family:var(--mono); font-size:12px; color:var(--text-dim); margin-bottom:8px;}
+  .field label b{color:var(--amber); font-weight:600;}
+
+  input[type=range]{
+    width:100%; accent-color:var(--amber); cursor:pointer;
+  }
+  select, input[type=number]{
+    background:var(--bg-panel-2); border:1px solid var(--border); color:var(--text);
+    font-family:var(--mono); font-size:13px; border-radius:6px; padding:9px 10px;
+    width:100%;
+  }
+  select:focus, input:focus{border-color:var(--amber);}
+
+  .lane-box{border:1px solid var(--border); border-radius:8px; padding:14px; background:var(--bg-panel-2);}
+  .lane-box-title{font-family:var(--mono); font-size:12px; color:var(--text-dim); margin-bottom:10px; letter-spacing:0.02em;}
+  .row3{display:grid; grid-template-columns:1fr 52px auto; gap:8px; align-items:center;}
+  .row3 input[type=number]{padding:9px 6px; text-align:center;}
+
+  .chk{display:flex; align-items:center; gap:6px; font-family:var(--mono); font-size:11.5px; color:var(--text-faint); white-space:nowrap;}
+  .chk input{accent-color:var(--amber); width:14px; height:14px;}
+  .chk-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+
+  .hint{font-size:11.5px; color:var(--text-faint); margin-top:-6px;}
+
+  .sim-output{padding:24px; display:flex; flex-direction:column; gap:14px;}
+  .out-empty{
+    color:var(--text-faint); font-size:14px; font-family:var(--mono);
+    display:flex; align-items:center; justify-content:center; min-height:220px; text-align:center;
+  }
+  .out-empty b{color:var(--amber);}
+
+  .out-row{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  @media (max-width:520px){ .out-row{grid-template-columns:1fr;} }
+  .result-card{
+    border:1px solid var(--border); border-radius:8px; padding:16px 18px; background:var(--bg-panel-2);
+  }
+  .result-card h5{font-family:var(--mono); font-size:11.5px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:10px;}
+  .result-card .pick{font-size:16px; font-weight:600; color:var(--text); margin-bottom:4px;}
+  .result-card .meta{font-family:var(--mono); font-size:12px; color:var(--text-dim);}
+  .result-card.amber{border-color:var(--amber-dim);}
+  .result-card.amber .pick{color:var(--amber);}
+
+  .readout{
+    font-family:var(--mono); font-size:12.5px; color:var(--blue);
+    background:var(--bg-panel-2); border:1px solid var(--border); border-radius:8px;
+    padding:12px 16px;
+  }
+
+  .legal-out{border:1px solid var(--border); border-radius:8px; padding:16px 18px; background:var(--bg-panel-2);}
+  .legal-out h5{font-family:var(--mono); font-size:11.5px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:8px;}
+  .legal-out p{font-size:13.5px; color:var(--text-dim); margin-bottom:6px;}
+  .legal-out p b{color:var(--text);}
+
+  .scn-card{position:relative; display:flex; flex-direction:column;}
+  .scn-try{
+    margin-top:14px; align-self:flex-start;
+    font-family:var(--mono); font-size:11.5px; color:var(--amber);
+    background:none; border:none; padding:0; cursor:pointer;
+    text-decoration:none; opacity:0.85;
+  }
+  .scn-try:hover{opacity:1; text-decoration:underline;}
+</style>
+</head>
+<body>
+
+<header>
+  <nav>
+    <div class="brand"><span class="mark">◤</span>ForkPoint</div>
+    <ul>
+      <li><a href="#problem">Problem</a></li>
+      <li><a href="#modules">Mimari</a></li>
+      <li><a href="#demo">Simülasyon</a></li>
+      <li><a href="#fark">Neden Biz</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+
+  <!-- ================= HERO ================= -->
+  <section class="hero wrap">
+    <div class="eyebrow">Otonom Araç Karar Motoru</div>
+    <h1>Fren mesafesi<br>tükendiğinde,<br><span class="accent">kararı kim verir?</span></h1>
+    <p class="lead">
+      ForkPoint, otonom araçların kaza kaçınılmaz hâle geldiği anda hangi yolu seçeceğini —
+      gerçek fizik, birden fazla etik model ve kaza sonrası hukuki sorumlulukla birlikte —
+      hesaplayan ve karşılaştıran bir karar motoru.
+    </p>
+    <div class="cta-row">
+      <a href="#demo" class="btn btn-primary">Simülasyonu incele →</a>
+      <a href="#modules" class="btn btn-ghost">Mimariyi gör</a>
+    </div>
+    <div class="term">
+<span class="c">&gt;&gt;&gt;</span> secenek = <span class="k">hibrit_risk_ile_karar_ver</span>(secenekler, <span class="s">{"hiz_kmh"</span>: 70, <span class="s">"aktor_turu"</span>: <span class="s">"yaya"</span>})<br>
+<span class="c">&gt;&gt;&gt;</span> secenek[<span class="s">"isim"</span>] <span class="c">›</span> <span class="s">"Düz git"</span>&nbsp;&nbsp;<span class="c"># en düşük riskli seçenek</span>
+    </div>
+
+    <div class="road-wrap" aria-hidden="true">
+      <svg viewBox="0 0 1000 260" preserveAspectRatio="xMidYMid meet">
+        <path class="road-path" d="M500 10 L500 130 L220 250" />
+        <path class="road-path" d="M500 10 L500 130 L500 250" />
+        <path class="road-path hi" d="M500 10 L500 130 L780 250" />
+        <circle cx="500" cy="130" r="4" fill="#ffb020"/>
+        <text x="150" y="248" class="lane-label">SOLA KIR · yaya</text>
+        <text x="430" y="248" class="lane-label">DÜZ GİT · duvar</text>
+        <text x="700" y="248" class="lane-label amber">SAĞA KIR · araç</text>
+      </svg>
+    </div>
+  </section>
+
+  <div class="lane"></div>
+
+  <!-- ================= PROBLEM ================= -->
+  <section id="problem" class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Problem</div>
+      <h2>Tramvay ikilemi artık bir kod dalı</h2>
+    </div>
+    <div class="problem-card reveal">
+      <div class="glyph">?</div>
+      <div>
+        <p>
+          Bir insan sürücü kaza anında refleksle karar verir; kimse o kararı önceden
+          "programlamaz." Otonom bir araçta durum farklı: hangi tarafın feda edileceği,
+          kaza gerçekleşmeden aylar önce bir yazılım ekibi tarafından kodlanmış olur.
+        </p>
+        <p>
+          Bu da klasik "tramvay ikilemi"ni soyut bir felsefe sorusu olmaktan çıkarıp,
+          gerçek bir mühendislik ve hukuk problemine dönüştürüyor: karar hangi mantıkla
+          verilmeli, ve o karardan sonra kim sorumlu tutulmalı?
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <div class="lane amber"></div>
+
+  <!-- ================= MODULES ================= -->
+  <section id="modules" class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Mimari</div>
+      <h2>Üç bağımsız motor, tek karar</h2>
+      <p>Kod tabanı üç dosyaya ayrılıyor; her biri kaza anının farklı bir boyutunu modelliyor.</p>
+    </div>
+
+    <!-- etik_motor -->
+    <div class="module">
+      <div class="module-head">
+        <h3>Etik Motor</h3>
+        <span class="file">etik_motor.py</span>
+      </div>
+      <div class="module-body">
+        <p class="desc">
+          Aynı senaryoyu iki farklı ahlaki çerçeveden değerlendiren, birbirine karşıt
+          iki temel modeli çalıştırır.
+        </p>
+        <div class="chip-row">
+          <span class="chip"><b>Faydacı Model</b> — kural ihlaline bakmaz, en az kişinin etkilendiği seçeneği seçer</span>
+          <span class="chip"><b>Kural Tabanlı Model</b> — kurallara uyanı korur, ihlal edeni feda eder</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- fizik_motor -->
+    <div class="module">
+      <div class="module-head">
+        <h3>Fizik Motoru</h3>
+        <span class="file">fizik_motor.py</span>
+      </div>
+      <div class="module-body">
+        <p class="desc">
+          Kararı kişi sayısından ibaret görmez; aracın gerçekten durabilip duramayacağını
+          hesaplar. Bunun için iki modeli birleştirir.
+        </p>
+        <div class="formula">TOPLAM DURMA<span class="op">=</span>TEPKİ MESAFESİ<span class="op">+</span>FREN MESAFESİ</div>
+        <p class="desc" style="margin-bottom:10px; font-size:13px;">Aktör hassasiyet endeksi (0–1, çarpışmaya kırılganlık):</p>
+        <div class="bar-row">
+          <div class="bar-item"><span class="lbl">yaya</span><span class="track"><span class="fill" style="width:100%"></span></span><span class="val">1.00</span></div>
+          <div class="bar-item"><span class="lbl">bisikletli</span><span class="track"><span class="fill" style="width:90%"></span></span><span class="val">0.90</span></div>
+          <div class="bar-item"><span class="lbl">diğer araç</span><span class="track"><span class="fill" style="width:50%"></span></span><span class="val">0.50</span></div>
+          <div class="bar-item"><span class="lbl">duvar</span><span class="track"><span class="fill" style="width:15%"></span></span><span class="val">0.15</span></div>
+          <div class="bar-item"><span class="lbl">sabit engel</span><span class="track"><span class="fill" style="width:10%"></span></span><span class="val">0.10</span></div>
+        </div>
+        <p class="desc" style="margin-top:22px;">
+          <b style="color:var(--text)">Hibrit model</b>, bu fiziksel riski alıp kural ihlali
+          yapan tarafın zararını ağırlığını düşürerek yeniden hesaplar — "riski kendi yaratan,
+          sorumluluğun bir kısmını taşır" mantığını sayısallaştırır.
+        </p>
+      </div>
+    </div>
+
+    <!-- hukuki_motor -->
+    <div class="module">
+      <div class="module-head">
+        <h3>Hukuki Motor</h3>
+        <span class="file">hukuki_motor.py</span>
+      </div>
+      <div class="module-body">
+        <p class="desc">
+          Karar verildikten sonraki soruyu cevaplar: kaza olduğunda kim sorumlu?
+          İki ayrı katmanda çalışır.
+        </p>
+        <div class="legal-grid">
+          <div class="legal-col">
+            <h4>OLAY SORUMLULUĞU</h4>
+            <ol>
+              <li><span class="n">01</span> Sistem arızası varsa → üretici sorumlu</li>
+              <li><span class="n">02</span> Bakım ihmali varsa → araç sahibi sorumlu</li>
+              <li><span class="n">03</span> Üçüncü taraf ihlal etti + araç doğru tepki verdiyse → üçüncü taraf sorumlu</li>
+              <li><span class="n">04</span> Hiçbiri değilse → sigorta kapsamında, paylaşımlı</li>
+            </ol>
+          </div>
+          <div class="legal-col">
+            <h4>TASARIM SORUMLULUĞU</h4>
+            <ol>
+              <li><span class="n">→</span> Olay öncesi bir kusur varsa, tasarım sorumluluğu ikincil kalır</li>
+              <li><span class="n">→</span> Gerçek mücbir sebep durumunda (kusur yok), algoritmanın önceden kodlanmış tercihi tartışmaya açılır</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="lane"></div>
+
+  <!-- ================= DEMO ================= -->
+  <section id="demo" class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Simülasyon</div>
+      <h2>Senaryoyu kur, dört modeli aynı anda izle</h2>
+      <p>Masaüstü arayüzünde hazır senaryolar çalıştırılabilir ya da her şeride kendi aktörünüzü (yaya, bisikletli, araç, duvar) yerleştirerek kendi senaryonuz kurulabilir.</p>
+    </div>
+
+    <div class="mock reveal">
+      <div class="mock-bar">
+        <span></span><span></span><span></span>
+        <span class="title">forkpoint — arayüz mockup'ı (statik görsel)</span>
+      </div>
+      <div class="mock-body">
+        <svg viewBox="0 0 900 220" preserveAspectRatio="xMidYMid meet">
+          <line x1="40" y1="50" x2="860" y2="50" stroke="#242a34" stroke-width="1"/>
+          <line x1="40" y1="110" x2="860" y2="110" stroke-dasharray="10 10" stroke="#5b6273" stroke-width="1.5"/>
+          <line x1="40" y1="170" x2="860" y2="170" stroke="#242a34" stroke-width="1"/>
+
+          <!-- lane labels -->
+          <text x="40" y="38" class="lane-label">SOLA KIR</text>
+          <text x="40" y="98" class="lane-label">DÜZ GİT</text>
+          <text x="40" y="158" class="lane-label">SAĞA KIR</text>
+
+          <!-- car -->
+          <g transform="translate(140,50)">
+            <rect x="-22" y="-9" width="44" height="18" rx="4" fill="#171b22" stroke="#5ec8ff" stroke-width="1.5"/>
+            <circle cx="-12" cy="9" r="3" fill="#5ec8ff"/>
+            <circle cx="12" cy="9" r="3" fill="#5ec8ff"/>
+          </g>
+
+          <!-- pedestrian icon (lane1, right side) -->
+          <g transform="translate(760,50)" stroke="#ff6a5c" stroke-width="2.4" fill="none" stroke-linecap="round">
+            <circle cx="0" cy="-10" r="4" fill="#ff6a5c" stroke="none"/>
+            <line x1="0" y1="-6" x2="0" y2="8"/>
+            <line x1="0" y1="8" x2="-6" y2="18"/>
+            <line x1="0" y1="8" x2="6" y2="18"/>
+            <line x1="0" y1="-2" x2="-8" y2="4"/>
+            <line x1="0" y1="-2" x2="8" y2="4"/>
+          </g>
+          <text x="726" y="34" class="lane-label" fill="#ff6a5c">yaya · 2 kişi</text>
+
+          <!-- wall icon lane 2 -->
+          <g transform="translate(760,110)">
+            <rect x="-17" y="-17" width="34" height="34" fill="#171b22" stroke="#8992a3" stroke-width="1.5"/>
+            <line x1="-17" y1="-8.5" x2="17" y2="-8.5" stroke="#8992a3"/>
+            <line x1="-17" y1="0" x2="17" y2="0" stroke="#8992a3"/>
+            <line x1="-17" y1="8.5" x2="17" y2="8.5" stroke="#8992a3"/>
+          </g>
+          <text x="726" y="94" class="lane-label">duvar · 0 kişi</text>
+
+          <!-- other car icon lane 3 -->
+          <g transform="translate(760,170)">
+            <rect x="-22" y="-9" width="44" height="18" rx="4" fill="#171b22" stroke="#ffb020" stroke-width="1.5"/>
+            <circle cx="-12" cy="9" r="3" fill="#ffb020"/>
+            <circle cx="12" cy="9" r="3" fill="#ffb020"/>
+          </g>
+          <text x="726" y="154" class="lane-label amber">diğer araç · 1 kişi</text>
+        </svg>
+      </div>
+    </div>
+
+    <div style="height:26px"></div>
+
+    <!-- ============ CANLI SİMÜLASYON (gerçek çalışan hesaplama) ============ -->
+    <div class="sim-panel reveal" id="sim">
+      <div class="sim-head">
+        <span class="dot"></span>
+        <span class="title">CANLI SİMÜLASYON</span>
+        <span class="sub">fizik_motor.py + etik_motor.py + hukuki_motor.py mantığının JS'e taşınmış hâli — tarayıcıda gerçekten hesaplanır</span>
+      </div>
+
+      <div class="sim-grid">
+        <div class="sim-controls">
+
+          <div class="field">
+            <label>Hız <b id="hizVal">70</b> km/h</label>
+            <input type="range" id="hiz" min="20" max="130" value="70">
+          </div>
+
+          <div class="field">
+            <label>Yol durumu</label>
+            <select id="surtunme">
+              <option value="0.8">Kuru asfalt (μ=0.8)</option>
+              <option value="0.4" selected>Islak asfalt (μ=0.4)</option>
+              <option value="0.2">Çamurlu/gevşek zemin (μ=0.2)</option>
+              <option value="0.1">Buzlu/karlı yol (μ=0.1)</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Engele mesafe <b id="mesafeVal">25</b> m</label>
+            <input type="range" id="mesafe" min="10" max="100" value="25">
+          </div>
+
+          <div class="lane-box">
+            <div class="lane-box-title">Sola Kır Şeridi</div>
+            <div class="row3">
+              <select id="solaAktor">
+                <option value="yaya">yaya</option>
+                <option value="bisikletli">bisikletli</option>
+                <option value="diger_arac">diğer araç</option>
+                <option value="sabit_engel">sabit engel</option>
+                <option value="duvar">duvar</option>
+              </select>
+              <input type="number" id="solaSayi" min="0" max="9" value="0">
+              <label class="chk"><input type="checkbox" id="solaIhlal"> ihlal</label>
+            </div>
+          </div>
+
+          <div class="lane-box">
+            <div class="lane-box-title">Düz Git Şeridi</div>
+            <div class="row3">
+              <select id="duzAktor">
+                <option value="yaya">yaya</option>
+                <option value="bisikletli">bisikletli</option>
+                <option value="diger_arac">diğer araç</option>
+                <option value="sabit_engel">sabit engel</option>
+                <option value="duvar">duvar</option>
+              </select>
+              <input type="number" id="duzSayi" min="0" max="9" value="1">
+              <label class="chk"><input type="checkbox" id="duzIhlal"> ihlal</label>
+            </div>
+          </div>
+
+          <div class="lane-box">
+            <div class="lane-box-title">Sağa Kır Şeridi</div>
+            <div class="row3">
+              <select id="sagaAktor">
+                <option value="yaya">yaya</option>
+                <option value="bisikletli">bisikletli</option>
+                <option value="diger_arac" selected>diğer araç</option>
+                <option value="sabit_engel">sabit engel</option>
+                <option value="duvar">duvar</option>
+              </select>
+              <input type="number" id="sagaSayi" min="0" max="9" value="0">
+              <label class="chk"><input type="checkbox" id="sagaIhlal"> ihlal</label>
+            </div>
+          </div>
+
+          <p class="hint">Etkilenen sayısı 0 olan şeritler senaryodan otomatik çıkarılır.</p>
+
+          <div class="lane-box">
+            <div class="lane-box-title">Olay Öncesi Hukuki Durum</div>
+            <div class="chk-grid">
+              <label class="chk"><input type="checkbox" id="sistemArizasi"> sistem arızası</label>
+              <label class="chk"><input type="checkbox" id="bakimIhmali"> bakım ihmali</label>
+              <label class="chk"><input type="checkbox" id="ucuncuIhlal" checked> üçüncü taraf ihlali</label>
+              <label class="chk"><input type="checkbox" id="dogruTepki" checked> araç doğru tepki verdi</label>
+            </div>
+          </div>
+
+          <button class="btn btn-primary" id="hesaplaBtn" style="width:100%; justify-content:center; margin-top:6px;">Hesapla →</button>
+        </div>
+
+        <div class="sim-output" id="simOutput">
+          <div class="out-empty">Soldaki değerleri ayarlayıp <b>Hesapla</b>'ya basın.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:26px"></div>
+
+    <div class="scn-grid reveal" id="scnGrid">
+      <div class="scn-card" data-scn="A"><div class="id">SENARYO A</div><div class="t">Fren arızası</div><div class="d">3 kural ihlalci yayaya karşı 1 kurallı yolcu</div><button class="scn-try" data-scn="A">Bu senaryoyu dene →</button></div>
+      <div class="scn-card" data-scn="B"><div class="id">SENARYO B</div><div class="t">Eşit sayı</div><div class="d">Biri kırmızıda geçen yaya, araç doğru tepki verdi</div><button class="scn-try" data-scn="B">Bu senaryoyu dene →</button></div>
+      <div class="scn-card" data-scn="C"><div class="id">SENARYO C</div><div class="t">Ani buzlanma</div><div class="d">Mücbir sebep — iki taraf da kurallara uygun</div><button class="scn-try" data-scn="C">Bu senaryoyu dene →</button></div>
+      <div class="scn-card" data-scn="D"><div class="id">SENARYO D</div><div class="t">Bakım ihmali</div><div class="d">Aşınmış fren balatası, düşürülmüş sürtünme</div><button class="scn-try" data-scn="D">Bu senaryoyu dene →</button></div>
+      <div class="scn-card" data-scn="E"><div class="id">SENARYO E</div><div class="t">Karma aktörler</div><div class="d">Solda yaya, sağda araç, düzde duvar</div><button class="scn-try" data-scn="E">Bu senaryoyu dene →</button></div>
+      <div class="scn-card"><div class="id">SENARYO +</div><div class="t">Kendi senaryon</div><div class="d">Hız, yol durumu, aktör ve şerit sizin seçiminiz</div><button class="scn-try" data-scn="CUSTOM">Panele git →</button></div>
+    </div>
+  </section>
+
+  <div class="lane amber"></div>
+
+  <!-- ================= FARK ================= -->
+  <section id="fark" class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Neden Biz</div>
+      <h2>Ayrık duran üç parça, ilk kez birlikte</h2>
+      <p>Mevcut araçlar genelde bu üç boyuttan sadece birine odaklanıyor.</p>
+    </div>
+
+    <div class="diff-wrap reveal">
+      <table class="diff">
+        <thead>
+          <tr><th>Araç</th><th>Fiziksel çarpışma modeli</th><th>Etik karar modeli</th><th>Hukuki sorumluluk</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>CARLA / IPG CarMaker</td><td class="yes">✓</td><td>—</td><td>—</td></tr>
+          <tr><td>MIT Moral Machine</td><td>—</td><td class="yes">✓</td><td>—</td></tr>
+          <tr><td><b>ForkPoint</b></td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="stack reveal">
+      <span>Python</span><span>tkinter</span><span>pandas</span><span>matplotlib</span><span>numpy</span>
+    </div>
+  </section>
+
+</main>
+
+<footer class="wrap">
+  <div class="fbrand"><b>ForkPoint</b> — otonom araç karar motoru</div>
+  <div class="fnote">Açık kaynak Python ile geliştirildi. İTÜ Çekirdek Otomotiv başvurusu kapsamında hazırlanmış bir tanıtım sayfasıdır.</div>
+</footer>
+
+<script>
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){ e.target.classList.add('in-view'); io.unobserve(e.target); }
+    });
+  }, {threshold:0.15});
+  document.querySelectorAll('.reveal, .module').forEach(el=>io.observe(el));
+
+  /* ============================================================
+     AŞAĞIDAKİ FONKSİYONLAR fizik_motor.py / etik_motor.py /
+     hukuki_motor.py dosyalarındaki Python mantığının birebir
+     JavaScript karşılığıdır — tarayıcıda gerçekten hesaplanır.
+     ============================================================ */
+
+  const YERCEKIMI_IVMESI = 9.81;
+  const HASSASIYET_INDEKSI = { yaya:1.0, bisikletli:0.9, diger_arac:0.5, sabit_engel:0.1, duvar:0.15 };
+  const AKTOR_ETIKET = { yaya:"yaya", bisikletli:"bisikletli", diger_arac:"diğer araç", sabit_engel:"sabit engel", duvar:"duvar" };
+
+  const r2 = (x)=> Math.round(x*100)/100;
+  const r3 = (x)=> Math.round(x*1000)/1000;
+  const kmhToMs = (v)=> v/3.6;
+
+  function tepkiMesafesi(hizKmh, tepkiSuresi=0.5){
+    return r2(kmhToMs(hizKmh) * tepkiSuresi);
+  }
+  function mekanikFrenMesafesi(hizKmh, mu){
+    const v = kmhToMs(hizKmh);
+    return r2((v*v) / (2*YERCEKIMI_IVMESI*mu));
+  }
+  function toplamDurmaMesafesi(hizKmh, mu, tepkiSuresi=0.5){
+    return r2(tepkiMesafesi(hizKmh, tepkiSuresi) + mekanikFrenMesafesi(hizKmh, mu));
+  }
+
+  function riskSkoruHesapla(secenekTipi, aktorTuru, aktorSayisi, fizikselDurum){
+    if(secenekTipi === "Düz Git ve Fren Yap" && fizikselDurum.toplamDurma <= fizikselDurum.engeleMesafe){
+      return 0.0;
+    }
+    const hassasiyet = HASSASIYET_INDEKSI[aktorTuru] ?? 0.5;
+    let carpisma;
+    if(secenekTipi === "Düz Git ve Fren Yap"){
+      carpisma = Math.min(1.0, fizikselDurum.toplamDurma / fizikselDurum.engeleMesafe);
+    } else {
+      carpisma = (aktorTuru === "sabit_engel") ? 0.4 : 0.7;
+    }
+    return r2(hassasiyet * carpisma * aktorSayisi);
+  }
+
+  function secenekTipiBelirle(isim){
+    return isim === "Düz git" ? "Düz Git ve Fren Yap" : "Manevra";
+  }
+
+  function fizikselRiskIleKararVer(secenekler, fp){
+    const toplamDurma = toplamDurmaMesafesi(fp.hizKmh, fp.surtunme);
+    const fizikselDurum = { toplamDurma, engeleMesafe: fp.engeleMesafe };
+    const riskler = {};
+    secenekler.forEach(s=>{
+      riskler[s.isim] = riskSkoruHesapla(secenekTipiBelirle(s.isim), s.aktorTuru, s.sayi, fizikselDurum);
+    });
+    let enIyi = secenekler[0];
+    secenekler.forEach(s=>{ if(riskler[s.isim] < riskler[enIyi.isim]) enIyi = s; });
+    return { secilen: enIyi, riskler, toplamDurma };
+  }
+
+  function hibritRiskIleKararVer(secenekler, fp, agirlik={ihlal:0.5, uyumlu:1.0}){
+    const toplamDurma = toplamDurmaMesafesi(fp.hizKmh, fp.surtunme);
+    const fizikselDurum = { toplamDurma, engeleMesafe: fp.engeleMesafe };
+    const ham = {}, hibrit = {};
+    secenekler.forEach(s=>{
+      const h = riskSkoruHesapla(secenekTipiBelirle(s.isim), s.aktorTuru, s.sayi, fizikselDurum);
+      const carpan = s.ihlal ? agirlik.ihlal : agirlik.uyumlu;
+      ham[s.isim] = h;
+      hibrit[s.isim] = r3(h * carpan);
+    });
+    let enIyi = secenekler[0];
+    secenekler.forEach(s=>{ if(hibrit[s.isim] < hibrit[enIyi.isim]) enIyi = s; });
+    return { secilen: enIyi, hibrit, ham, toplamDurma };
+  }
+
+  function faydaciKarar(secenekler){
+    let enIyi = secenekler[0];
+    secenekler.forEach(s=>{ if(s.sayi < enIyi.sayi) enIyi = s; });
+    return enIyi;
+  }
+
+  function kuralTabanliKarar(secenekler){
+    const kurallilar = secenekler.filter(s=>!s.ihlal);
+    if(kurallilar.length > 0){
+      const ihlalci = secenekler.find(s=>s.ihlal);
+      if(ihlalci) return ihlalci;
+    }
+    return faydaciKarar(secenekler);
+  }
+
+  function sorumlulukBelirle(hd){
+    if(hd.sistemArizasi) return "Üretici/Yazılım Geliştirici Sorumlu";
+    if(hd.bakimIhmali) return "Araç Sahibi Sorumlu";
+    if(hd.ucuncuIhlal && hd.dogruTepki) return "Üçüncü Taraf (Kural İhlali Yapan) Sorumlu";
+    return "Kaçınılmaz Durum — Sorumluluk Paylaşımlı / Sigorta Kapsamında";
+  }
+
+  function tasarimSorumlulugu(hd, modelAdi, secilen){
+    const kusurVar = hd.sistemArizasi || hd.bakimIhmali || hd.ucuncuIhlal;
+    if(kusurVar) return "Tasarım sorumluluğu ikincil kalır (olay öncesi kusur zaten birincil sebep).";
+    return `Tasarım sorumluluğu tartışmaya açık — ${modelAdi} önceden programlanmış tercihle "${secilen.isim}" kararını verdi.`;
+  }
+
+  /* ---------------- UI wiring ---------------- */
+  const $ = (id)=> document.getElementById(id);
+
+  $('hiz').addEventListener('input', ()=> $('hizVal').textContent = $('hiz').value);
+  $('mesafe').addEventListener('input', ()=> $('mesafeVal').textContent = $('mesafe').value);
+
+  function okuSecenekler(){
+    const lanes = [
+      {isim:"Sola kır", aktorSel:"solaAktor", sayiSel:"solaSayi", ihlalSel:"solaIhlal"},
+      {isim:"Düz git",  aktorSel:"duzAktor",  sayiSel:"duzSayi",  ihlalSel:"duzIhlal"},
+      {isim:"Sağa kır", aktorSel:"sagaAktor", sayiSel:"sagaSayi", ihlalSel:"sagaIhlal"},
+    ];
+    return lanes
+      .map(l=>({
+        isim:l.isim,
+        aktorTuru:$(l.aktorSel).value,
+        sayi:parseInt($(l.sayiSel).value || "0", 10),
+        ihlal:$(l.ihlalSel).checked,
+      }))
+      .filter(s=>s.sayi > 0);
+  }
+
+  function hesapla(){
+    const secenekler = okuSecenekler();
+    const out = $('simOutput');
+
+    if(secenekler.length < 2){
+      out.innerHTML = `<div class="out-empty">En az iki şeritte etkilenen kişi sayısı 0'dan büyük olmalı (şu an ${secenekler.length}).</div>`;
+      return;
+    }
+
+    const fp = {
+      hizKmh: parseFloat($('hiz').value),
+      surtunme: parseFloat($('surtunme').value),
+      engeleMesafe: parseFloat($('mesafe').value),
+    };
+    const hd = {
+      sistemArizasi: $('sistemArizasi').checked,
+      bakimIhmali: $('bakimIhmali').checked,
+      ucuncuIhlal: $('ucuncuIhlal').checked,
+      dogruTepki: $('dogruTepki').checked,
+    };
+
+    const faydaci = faydaciKarar(secenekler);
+    const kural = kuralTabanliKarar(secenekler);
+    const fizik = fizikselRiskIleKararVer(secenekler, fp);
+    const hibrit = hibritRiskIleKararVer(secenekler, fp);
+    const olaySorum = sorumlulukBelirle(hd);
+    const tasarimF = tasarimSorumlulugu(hd, "Faydacı Model", faydaci);
+    const tasarimK = tasarimSorumlulugu(hd, "Kural Tabanlı Model", kural);
+
+    const riskStr = Object.entries(fizik.riskler).map(([k,v])=>`${k}: ${v}`).join('  ·  ');
+    const hibritStr = Object.entries(hibrit.hibrit).map(([k,v])=>`${k}: ${v}`).join('  ·  ');
+
+    out.innerHTML = `
+      <div class="readout">TOPLAM DURMA MESAFESİ<span style="color:var(--text-faint)"> = </span>${fizik.toplamDurma} m<span style="color:var(--text-faint)"> · ENGELE MESAFE = </span>${fp.engeleMesafe} m</div>
+      <div class="out-row">
+        <div class="result-card">
+          <h5>Faydacı Model</h5>
+          <div class="pick">${faydaci.isim}</div>
+          <div class="meta">${faydaci.sayi} kişi · ${AKTOR_ETIKET[faydaci.aktorTuru]}</div>
+        </div>
+        <div class="result-card">
+          <h5>Kural Tabanlı Model</h5>
+          <div class="pick">${kural.isim}</div>
+          <div class="meta">${kural.sayi} kişi · ${AKTOR_ETIKET[kural.aktorTuru]}</div>
+        </div>
+        <div class="result-card amber">
+          <h5>Fizik Tabanlı Model</h5>
+          <div class="pick">${fizik.secilen.isim}</div>
+          <div class="meta">${riskStr}</div>
+        </div>
+        <div class="result-card amber">
+          <h5>Hibrit Model</h5>
+          <div class="pick">${hibrit.secilen.isim}</div>
+          <div class="meta">${hibritStr}</div>
+        </div>
+      </div>
+      <div class="legal-out">
+        <h5>Olay Sorumluluğu</h5>
+        <p><b>${olaySorum}</b></p>
+        <h5 style="margin-top:14px;">Tasarım Sorumluluğu</h5>
+        <p>Faydacı → ${tasarimF}</p>
+        <p>Kural Tabanlı → ${tasarimK}</p>
+      </div>
+    `;
+  }
+
+  $('hesaplaBtn').addEventListener('click', hesapla);
+
+  /* ---------------- hazır senaryo ön yüklemeleri ---------------- */
+  const PRESETS = {
+    A: { hiz:70, surtunme:0.4, mesafe:25,
+         sola:null, duz:{aktor:"yaya", sayi:1, ihlal:false}, saga:{aktor:"yaya", sayi:3, ihlal:true},
+         hukuki:{sistemArizasi:true, bakimIhmali:false, ucuncuIhlal:false, dogruTepki:false} },
+    B: { hiz:50, surtunme:0.8, mesafe:30,
+         sola:null, duz:{aktor:"yaya", sayi:1, ihlal:false}, saga:{aktor:"yaya", sayi:1, ihlal:true},
+         hukuki:{sistemArizasi:false, bakimIhmali:false, ucuncuIhlal:true, dogruTepki:true} },
+    C: { hiz:50, surtunme:0.1, mesafe:40,
+         sola:{aktor:"yaya", sayi:5, ihlal:false}, duz:{aktor:"yaya", sayi:2, ihlal:false}, saga:null,
+         hukuki:{sistemArizasi:false, bakimIhmali:false, ucuncuIhlal:false, dogruTepki:true} },
+    D: { hiz:60, surtunme:0.3, mesafe:28,
+         sola:null, duz:{aktor:"diger_arac", sayi:1, ihlal:false}, saga:{aktor:"diger_arac", sayi:2, ihlal:false},
+         hukuki:{sistemArizasi:false, bakimIhmali:true, ucuncuIhlal:false, dogruTepki:false} },
+    E: { hiz:55, surtunme:0.6, mesafe:22,
+         sola:{aktor:"yaya", sayi:2, ihlal:true}, duz:{aktor:"duvar", sayi:0, ihlal:false}, saga:{aktor:"diger_arac", sayi:1, ihlal:false},
+         hukuki:{sistemArizasi:false, bakimIhmali:false, ucuncuIhlal:true, dogruTepki:true} },
+  };
+  // Senaryo E'de "Düz git" 0 kişi etkiliyor (duvara çarpmadan durabiliyor) — canlı
+  // simülasyonda görünür kalması için burada 0 tutuluyor, fizik motoru zaten
+  // durma mesafesi engele mesafeden kısaysa riski 0 hesaplıyor.
+
+  function laneUygula(prefix, veri, varsayilanAktor){
+    if(!veri){
+      $(prefix+'Sayi').value = 0;
+      $(prefix+'Ihlal').checked = false;
+      $(prefix+'Aktor').value = varsayilanAktor;
+      return;
+    }
+    $(prefix+'Aktor').value = veri.aktor;
+    $(prefix+'Sayi').value = veri.sayi;
+    $(prefix+'Ihlal').checked = veri.ihlal;
+  }
+
+  document.querySelectorAll('.scn-try').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const key = btn.dataset.scn;
+      document.getElementById('sim').scrollIntoView({behavior:'smooth', block:'start'});
+
+      if(key === 'CUSTOM') return;
+
+      const p = PRESETS[key];
+      if(!p) return;
+
+      $('hiz').value = p.hiz; $('hizVal').textContent = p.hiz;
+      $('surtunme').value = p.surtunme;
+      $('mesafe').value = p.mesafe; $('mesafeVal').textContent = p.mesafe;
+
+      laneUygula('sola', p.sola, 'yaya');
+      laneUygula('duz', p.duz, 'yaya');
+      laneUygula('saga', p.saga, 'diger_arac');
+
+      $('sistemArizasi').checked = p.hukuki.sistemArizasi;
+      $('bakimIhmali').checked = p.hukuki.bakimIhmali;
+      $('ucuncuIhlal').checked = p.hukuki.ucuncuIhlal;
+      $('dogruTepki').checked = p.hukuki.dogruTepki;
+
+      setTimeout(hesapla, 300);
+    });
+  });
+</script>
+
+</body>
+</html>
