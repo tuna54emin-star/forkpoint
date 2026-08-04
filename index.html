@@ -535,7 +535,7 @@
     <div class="mock reveal">
       <div class="mock-bar">
         <span></span><span></span><span></span>
-        <span class="title">forkpoint — arayüz mockup'ı (statik görsel)</span>
+        <span class="title">forkpoint — canlı senaryo görünümü</span>
       </div>
       <div class="mock-body">
         <svg viewBox="0 0 900 220" preserveAspectRatio="xMidYMid meet">
@@ -548,43 +548,29 @@
           <text x="40" y="98" class="lane-label">DÜZ GİT</text>
           <text x="40" y="158" class="lane-label">SAĞA KIR</text>
 
-          <!-- car -->
-          <g transform="translate(140,50)">
+          <!-- ego araç -->
+          <g transform="translate(140,110)">
             <rect x="-22" y="-9" width="44" height="18" rx="4" fill="#171b22" stroke="#5ec8ff" stroke-width="1.5"/>
             <circle cx="-12" cy="9" r="3" fill="#5ec8ff"/>
             <circle cx="12" cy="9" r="3" fill="#5ec8ff"/>
           </g>
+          <text x="90" y="140" class="lane-label" fill="#5ec8ff">ForkPoint</text>
 
-          <!-- pedestrian icon (lane1, right side) -->
-          <g transform="translate(760,50)" stroke="#ff6a5c" stroke-width="2.4" fill="none" stroke-linecap="round">
-            <circle cx="0" cy="-10" r="4" fill="#ff6a5c" stroke="none"/>
-            <line x1="0" y1="-6" x2="0" y2="8"/>
-            <line x1="0" y1="8" x2="-6" y2="18"/>
-            <line x1="0" y1="8" x2="6" y2="18"/>
-            <line x1="0" y1="-2" x2="-8" y2="4"/>
-            <line x1="0" y1="-2" x2="8" y2="4"/>
-          </g>
-          <text x="726" y="34" class="lane-label" fill="#ff6a5c">yaya · 2 kişi</text>
+          <!-- sola kır şeridi aktörü -->
+          <g id="mock-icon-sola" transform="translate(760,50)"></g>
+          <text id="mock-label-sola" x="726" y="34" class="lane-label"></text>
 
-          <!-- wall icon lane 2 -->
-          <g transform="translate(760,110)">
-            <rect x="-17" y="-17" width="34" height="34" fill="#171b22" stroke="#8992a3" stroke-width="1.5"/>
-            <line x1="-17" y1="-8.5" x2="17" y2="-8.5" stroke="#8992a3"/>
-            <line x1="-17" y1="0" x2="17" y2="0" stroke="#8992a3"/>
-            <line x1="-17" y1="8.5" x2="17" y2="8.5" stroke="#8992a3"/>
-          </g>
-          <text x="726" y="94" class="lane-label">duvar · 0 kişi</text>
+          <!-- düz git şeridi aktörü -->
+          <g id="mock-icon-duz" transform="translate(760,110)"></g>
+          <text id="mock-label-duz" x="726" y="94" class="lane-label"></text>
 
-          <!-- other car icon lane 3 -->
-          <g transform="translate(760,170)">
-            <rect x="-22" y="-9" width="44" height="18" rx="4" fill="#171b22" stroke="#ffb020" stroke-width="1.5"/>
-            <circle cx="-12" cy="9" r="3" fill="#ffb020"/>
-            <circle cx="12" cy="9" r="3" fill="#ffb020"/>
-          </g>
-          <text x="726" y="154" class="lane-label amber">diğer araç · 1 kişi</text>
+          <!-- sağa kır şeridi aktörü -->
+          <g id="mock-icon-saga" transform="translate(760,170)"></g>
+          <text id="mock-label-saga" x="726" y="154" class="lane-label"></text>
         </svg>
       </div>
     </div>
+    <p class="hint" style="margin-top:10px;">Aşağıdaki paneldeki değerleri değiştirdikçe bu görsel de anlık güncellenir.</p>
 
     <div style="height:26px"></div>
 
@@ -844,6 +830,66 @@
   $('hiz').addEventListener('input', ()=> $('hizVal').textContent = $('hiz').value);
   $('mesafe').addEventListener('input', ()=> $('mesafeVal').textContent = $('mesafe').value);
 
+  /* ---------------- görsel: aktör ikonları ---------------- */
+  const IKON_RENK = { yaya:'#ff6a5c', bisikletli:'#ff6a5c', diger_arac:'#ffb020', sabit_engel:'#8992a3', duvar:'#8992a3' };
+
+  function ikonSvg(tur){
+    const c = IKON_RENK[tur] || '#8992a3';
+    if(tur === 'yaya'){
+      return `<circle cx="0" cy="-10" r="4" fill="${c}"/>
+        <line x1="0" y1="-6" x2="0" y2="8" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/>
+        <line x1="0" y1="8" x2="-6" y2="18" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/>
+        <line x1="0" y1="8" x2="6" y2="18" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/>
+        <line x1="0" y1="-2" x2="-8" y2="4" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/>
+        <line x1="0" y1="-2" x2="8" y2="4" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/>`;
+    }
+    if(tur === 'bisikletli'){
+      return `<circle cx="-10" cy="10" r="7" fill="none" stroke="${c}" stroke-width="2"/>
+        <circle cx="10" cy="10" r="7" fill="none" stroke="${c}" stroke-width="2"/>
+        <line x1="-10" y1="10" x2="0" y2="-7" stroke="${c}" stroke-width="2"/>
+        <line x1="0" y1="-7" x2="10" y2="10" stroke="${c}" stroke-width="2"/>
+        <line x1="-10" y1="10" x2="5" y2="10" stroke="${c}" stroke-width="2"/>
+        <circle cx="0" cy="-12" r="3" fill="${c}"/>`;
+    }
+    if(tur === 'sabit_engel'){
+      return `<polygon points="0,-16 -13,14 13,14" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"/>
+        <line x1="-7" y1="2" x2="7" y2="2" stroke="${c}" stroke-width="2"/>`;
+    }
+    if(tur === 'duvar'){
+      return `<rect x="-17" y="-17" width="34" height="34" fill="#171b22" stroke="${c}" stroke-width="1.5"/>
+        <line x1="-17" y1="-8.5" x2="17" y2="-8.5" stroke="${c}"/>
+        <line x1="-17" y1="0" x2="17" y2="0" stroke="${c}"/>
+        <line x1="-17" y1="8.5" x2="17" y2="8.5" stroke="${c}"/>`;
+    }
+    // diger_arac (varsayılan)
+    return `<rect x="-22" y="-9" width="44" height="18" rx="4" fill="#171b22" stroke="${c}" stroke-width="1.5"/>
+      <circle cx="-12" cy="9" r="3" fill="${c}"/>
+      <circle cx="12" cy="9" r="3" fill="${c}"/>`;
+  }
+
+  function mockupGuncelle(){
+    const seritler = [
+      {prefix:'sola', icon:'mock-icon-sola', label:'mock-label-sola'},
+      {prefix:'duz',  icon:'mock-icon-duz',  label:'mock-label-duz'},
+      {prefix:'saga', icon:'mock-icon-saga', label:'mock-label-saga'},
+    ];
+    seritler.forEach(s=>{
+      const tur = $(s.prefix+'Aktor').value;
+      const sayi = parseInt($(s.prefix+'Sayi').value || '0', 10);
+      const iconEl = $(s.icon);
+      const labelEl = $(s.label);
+      iconEl.innerHTML = ikonSvg(tur);
+      iconEl.style.opacity = sayi > 0 ? '1' : '0.28';
+      labelEl.textContent = `${AKTOR_ETIKET[tur]} · ${sayi} kişi`;
+      labelEl.setAttribute('fill', sayi > 0 ? (IKON_RENK[tur] || '#8992a3') : '#5b6273');
+    });
+  }
+
+  ['sola','duz','saga'].forEach(p=>{
+    $(p+'Aktor').addEventListener('change', mockupGuncelle);
+    $(p+'Sayi').addEventListener('input', mockupGuncelle);
+  });
+
   function okuSecenekler(){
     const lanes = [
       {isim:"Sola kır", aktorSel:"solaAktor", sayiSel:"solaSayi", ihlalSel:"solaIhlal"},
@@ -861,6 +907,7 @@
   }
 
   function hesapla(){
+    mockupGuncelle();
     const secenekler = okuSecenekler();
     const out = $('simOutput');
 
@@ -985,9 +1032,13 @@
       $('ucuncuIhlal').checked = p.hukuki.ucuncuIhlal;
       $('dogruTepki').checked = p.hukuki.dogruTepki;
 
+      mockupGuncelle();
       setTimeout(hesapla, 300);
     });
   });
+
+  // sayfa ilk açıldığında görseli mevcut varsayılan değerlerle çiz
+  mockupGuncelle();
 </script>
 
 </body>
