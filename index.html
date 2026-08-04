@@ -769,6 +769,24 @@
     return isim === "Düz git" ? "Düz Git ve Fren Yap" : "Manevra";
   }
 
+  /* EŞİTLİK KURALI: birden fazla seçenek tam olarak aynı en düşük riske sahipse,
+     aralarından HASSASİYET İNDEKSİ en düşük olan aktöre sahip seçenek tercih
+     edilir ("toplam risk eşitse, daha az kırılgan olana çarp"). Bu da
+     AGIRLIK_CARPANLARI gibi normatif bir tercihtir. fizik_motor.py'deki
+     _en_dusuk_riskli_secenegi_sec() ile birebir aynı mantık. */
+  function enDusukRiskliSecenegiSec(secenekler, riskSozlugu){
+    const enDusukRisk = Math.min(...Object.values(riskSozlugu));
+    const esitRiskliler = secenekler.filter(s=>riskSozlugu[s.isim] === enDusukRisk);
+    if(esitRiskliler.length === 1) return esitRiskliler[0];
+    let enAz = esitRiskliler[0];
+    esitRiskliler.forEach(s=>{
+      const hEn = HASSASIYET_INDEKSI[enAz.aktorTuru] ?? 0.5;
+      const hBu = HASSASIYET_INDEKSI[s.aktorTuru] ?? 0.5;
+      if(hBu < hEn) enAz = s;
+    });
+    return enAz;
+  }
+
   function fizikselRiskIleKararVer(secenekler, fp){
     const toplamDurma = toplamDurmaMesafesi(fp.hizKmh, fp.surtunme);
     const fizikselDurum = { toplamDurma, engeleMesafe: fp.engeleMesafe };
@@ -776,8 +794,7 @@
     secenekler.forEach(s=>{
       riskler[s.isim] = riskSkoruHesapla(secenekTipiBelirle(s.isim), s.aktorTuru, s.sayi, fizikselDurum);
     });
-    let enIyi = secenekler[0];
-    secenekler.forEach(s=>{ if(riskler[s.isim] < riskler[enIyi.isim]) enIyi = s; });
+    const enIyi = enDusukRiskliSecenegiSec(secenekler, riskler);
     return { secilen: enIyi, riskler, toplamDurma };
   }
 
@@ -791,8 +808,7 @@
       ham[s.isim] = h;
       hibrit[s.isim] = r3(h * carpan);
     });
-    let enIyi = secenekler[0];
-    secenekler.forEach(s=>{ if(hibrit[s.isim] < hibrit[enIyi.isim]) enIyi = s; });
+    const enIyi = enDusukRiskliSecenegiSec(secenekler, hibrit);
     return { secilen: enIyi, hibrit, ham, toplamDurma };
   }
 
